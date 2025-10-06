@@ -9,8 +9,8 @@ export const setupAssociations = () => {
   Reservation.belongsTo(Package, { foreignKey: 'packageId' });
 
   // Una Reservación pertenece a una opción de Música
-  Music.hasMany(Reservation, { foreignKey: 'musicId' });
-  Reservation.belongsTo(Music, { foreignKey: 'musicId' });
+  Reservation.belongsToMany(Music, { through: 'ReservationMusic' });
+  Music.belongsToMany(Reservation, { through: 'ReservationMusic' });
 
   // Una Reservación puede tener MUCHAS Botanas y una Botana en MUCHAS Reservaciones
   Reservation.belongsToMany(Snack, { through: 'ReservationSnacks' });

@@ -2,6 +2,7 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 import sequelize from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
+import cors from 'cors'; 
 import reservationRoutes from './routes/reservationRoutes.js';
 import optionsRoutes from './routes/optionsRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
@@ -11,6 +12,11 @@ import { setupAssociations } from './models/relationships.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+app.use(cors({
+  origin: 'http://localhost:5173', 
+  credentials: true 
+}));
 
 app.use(express.json());
 app.use(cookieParser());

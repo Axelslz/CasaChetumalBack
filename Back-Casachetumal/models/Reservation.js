@@ -35,6 +35,10 @@ const Reservation = sequelize.define('Reservation', {
     type: DataTypes.ENUM('pending', 'paid', 'refunded'),
     defaultValue: 'pending',
   },
+  paymentDeadline: { 
+    type: DataTypes.DATEONLY,
+    allowNull: true, 
+  },
   idPhotoPath: { 
     type: DataTypes.STRING,
     allowNull: false,
