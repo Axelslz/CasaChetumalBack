@@ -41,7 +41,7 @@ const Reservation = sequelize.define('Reservation', {
   },
   idPhotoPath: { 
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: true,
   },
   status: {
     type: DataTypes.ENUM('pending', 'confirmed', 'cancelled'),
