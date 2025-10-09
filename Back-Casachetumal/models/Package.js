@@ -7,11 +7,16 @@ const Package = sequelize.define('Package', {
     allowNull: false,
   },
   description: {
-    type: DataTypes.TEXT,
+    type: DataTypes.STRING,
+    allowNull: true, 
   },
   price: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
+  },
+  image: {
+    type: DataTypes.BLOB('long'), 
+    allowNull: true,
   },
 }, { timestamps: true });
 

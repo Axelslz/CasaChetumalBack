@@ -8,11 +8,16 @@ const Music = sequelize.define('Music', {
   },
   description: {
     type: DataTypes.STRING,
+    allowNull: true, 
   },
-  totalPrice: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: false
-  },
+  image: {
+    type: DataTypes.BLOB('long'), 
+    allowNull: true,
+  },
+  price: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+  },  
 }, { timestamps: true });
 
 export default Music;

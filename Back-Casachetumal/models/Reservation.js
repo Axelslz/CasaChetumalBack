@@ -26,7 +26,7 @@ const Reservation = sequelize.define('Reservation', {
   totalPrice: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false
-  },
+  },    
   paymentMethod: { 
     type: DataTypes.ENUM('cash', 'transfer'),
     allowNull: false,

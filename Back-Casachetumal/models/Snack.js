@@ -9,6 +9,14 @@ const Snack = sequelize.define('Snack', {
   ingredients: {
     type: DataTypes.STRING,
   },
+  description: {
+    type: DataTypes.STRING,
+    allowNull: true, 
+  },
+  image: {
+    type: DataTypes.BLOB('long'), 
+    allowNull: true,
+  },
   price: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
