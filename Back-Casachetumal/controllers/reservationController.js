@@ -1,8 +1,55 @@
 import Reservation from '../models/Reservation.js';
 import Package from '../models/Package.js';
 import Music from '../models/Music.js';
+import Drink from '../models/Drink.js';
 import Snack from '../models/Snack.js';
 import { Op } from 'sequelize';
+
+export const calculateTotal = async (req, res) => {
+  const SALON_BASE_PRICE = 3000;
+  try {
+    const { packageId, addons, musicIds } = req.body;
+    let total = SALON_BASE_PRICE;
+
+    if (packageId) {
+      const selectedPackage = await Package.findByPk(packageId);
+      if (selectedPackage) {
+        total += parseFloat(selectedPackage.price);
+      }
+    }
+
+    if (musicIds && musicIds.length > 0) {
+      const selectedMusic = await Music.findAll({ where: { id: musicIds } });
+      selectedMusic.forEach(music => {
+        total += parseFloat(music.price);
+      });
+    }
+
+    if (addons && Object.keys(addons).length > 0) {
+      const addonIds = Object.keys(addons);
+      
+      const snackPromise = Snack.findAll({ where: { id: addonIds } });
+      const drinkPromise = Drink.findAll({ where: { id: addonIds } });
+
+      const [foundSnacks, foundDrinks] = await Promise.all([snackPromise, drinkPromise]);
+
+      const allFoundAddons = [...foundSnacks, ...foundDrinks];
+      
+      allFoundAddons.forEach(addon => {
+        const quantity = addons[addon.id];
+        if (quantity) {
+          total += parseFloat(addon.price) * quantity;
+        }
+      });
+    }
+
+    res.json({ total });
+  } catch (error) {
+    console.error("ERROR AL CALCULAR TOTAL:", error);
+    res.status(500).json({ message: "Error en el servidor al calcular el total.", error: error.message });
+  }
+};
+
 
 export const createReservation = async (req, res) => {
   try {
@@ -51,7 +98,6 @@ export const createReservation = async (req, res) => {
     }
 
     if (musicIds && musicIds.length > 0) {
-      // Sequelize crea este método 'addMusics' automáticamente por la relación
       await newReservation.addMusics(musicIds);
     }
 
@@ -62,40 +108,41 @@ export const createReservation = async (req, res) => {
   }
 };
 
-// solo admin 
 export const getReservations = async (req, res) => {
   try {
     const { status, search } = req.query; 
     
     const whereClause = {};
-
     if (status && status !== 'all') {
       whereClause.status = status; 
     }
-
     if (search) {
-      whereClause.clientName = {
-        [Op.like]: `%${search}%` 
-      };
+      whereClause.clientName = { [Op.like]: `%${search}%` };
     }
 
     const reservations = await Reservation.findAll({
       where: whereClause, 
       include: [
-        { model: Package, attributes: ['name', 'price'] },
-        { model: Music, attributes: ['name', 'price'] },
-        { model: Snack, attributes: ['name', 'price'], through: { attributes: [] } }
+        { model: Package, attributes: ['name'] },
       ],
       order: [['eventDate', 'DESC']]
     });
-    res.json(reservations);
+
+    const formattedReservations = reservations.map(r => ({
+      id: r.id,
+      cliente: r.clientName, 
+      fecha: r.eventDate,   
+      paquete: r.Package ? r.Package.name : 'No Asignado', 
+      estado: r.status,      
+    }));
+    res.json(formattedReservations);
+
   } catch (error) {
+    console.error("Error al obtener reservaciones:", error); // Es buena práctica loguear el error
     res.status(500).json({ message: "Error al obtener las reservaciones." });
   }
 };
 
-// el carrito 
-   
 export const getReservationById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -114,7 +161,6 @@ export const getReservationById = async (req, res) => {
   }
 };
 
-// el admin actualice un estado (ej. a "confirmed")
 export const updateReservationStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -149,5 +195,27 @@ export const confirmPayment = async (req, res) => {
     res.json({ message: "Pago confirmado exitosamente.", reservation });
   } catch (error) {
     res.status(500).json({ message: "Error al confirmar el pago.", error: error.message });
+  }
+};
+
+export const getOccupiedDates = async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); 
+
+    const reservations = await Reservation.findAll({
+      where: {
+        status: { [Op.in]: ['confirmed', 'paid'] },
+        eventDate: { [Op.gte]: today }
+      },
+      attributes: ['eventDate']
+    });
+
+    const occupiedDates = reservations.map(r => r.eventDate);
+    res.json(occupiedDates);
+
+  } catch (error) {
+    console.error("Error al obtener fechas ocupadas:", error);
+    res.status(500).json({ message: "Error al obtener las fechas." });
   }
 };

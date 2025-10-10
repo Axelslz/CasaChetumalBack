@@ -23,7 +23,7 @@ app.use(cookieParser());
 app.use(express.static('public'));
 
 app.use('/api', authRoutes);
-app.use('/api', reservationRoutes);
+app.use('/api/reservations', reservationRoutes);
 app.use('/api', optionsRoutes);
 app.use('/api', dashboardRoutes); 
 app.use('/api', calendarRoutes);
