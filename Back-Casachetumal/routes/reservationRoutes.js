@@ -6,15 +6,12 @@ import upload from '../middlewares/uploadMiddleware.js';
 const router = Router();
 
 router.post('/calculate-total', calculateTotal);
-
-router.post('/', upload.single('idPhoto'), createReservation); 
+router.get('/occupied-dates', getOccupiedDates);
+router.post('/', upload.single('idPhoto'), createReservation); -
 router.get('/:id', getReservationById);
 
-// --- Rutas Admin ---
 router.get('/', authRequired, getReservations); 
 router.put('/:id/status', authRequired, updateReservationStatus); 
 router.put('/:id/confirm-payment', authRequired, confirmPayment); 
-router.get('/occupied-dates', getOccupiedDates);
 
 export default router;
-

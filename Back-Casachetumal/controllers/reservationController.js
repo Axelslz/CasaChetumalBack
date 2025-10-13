@@ -81,24 +81,25 @@ export const createReservation = async (req, res) => {
       paymentDeadline = deadlineDate.toISOString().split('T')[0]; 
     }
 
-    if (!req.file) {
-      return res.status(400).json({ message: "La foto de la identificación es requerida." });
-    }
-
-    const newReservation = await Reservation.create({
+    const reservationData = {
       clientName, clientPhone, eventDate, eventTime, totalPrice,
-      idPhotoPath: req.file.path,
       packageId,
       paymentMethod,
       paymentDeadline, 
-    });
+    };
+
+    if (req.file) {
+      reservationData.idPhotoPath = req.file.path;
+    }
+    
+    const newReservation = await Reservation.create(reservationData);
 
     if (snackIds && snackIds.length > 0) {
       await newReservation.addSnacks(snackIds);
     }
 
     if (musicIds && musicIds.length > 0) {
-      await newReservation.addMusics(musicIds);
+      await newReservation.addMusic(musicIds);  
     }
 
     res.status(201).json(newReservation);
@@ -138,7 +139,7 @@ export const getReservations = async (req, res) => {
     res.json(formattedReservations);
 
   } catch (error) {
-    console.error("Error al obtener reservaciones:", error); // Es buena práctica loguear el error
+    console.error("Error al obtener reservaciones:", error); 
     res.status(500).json({ message: "Error al obtener las reservaciones." });
   }
 };
@@ -201,18 +202,26 @@ export const confirmPayment = async (req, res) => {
 export const getOccupiedDates = async (req, res) => {
   try {
     const today = new Date();
-    today.setHours(0, 0, 0, 0); 
+    today.setHours(0, 0, 0, 0);
 
     const reservations = await Reservation.findAll({
       where: {
-        status: { [Op.in]: ['confirmed', 'paid'] },
+        status: { [Op.ne]: 'cancelled' }, 
         eventDate: { [Op.gte]: today }
       },
-      attributes: ['eventDate']
+      attributes: ['eventDate', 'status', 'paymentStatus'] 
     });
 
-    const occupiedDates = reservations.map(r => r.eventDate);
-    res.json(occupiedDates);
+    const datesWithStatus = reservations.map(r => {
+      const displayStatus = r.paymentStatus === 'paid' ? 'confirmed' : 'pending';
+      
+      return {
+        date: r.eventDate,
+        status: displayStatus 
+      };
+    });
+    
+    res.json(datesWithStatus);
 
   } catch (error) {
     console.error("Error al obtener fechas ocupadas:", error);
