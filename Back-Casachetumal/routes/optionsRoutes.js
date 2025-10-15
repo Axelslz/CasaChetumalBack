@@ -1,8 +1,9 @@
-import { Router } from 'express';
-import { getOptions } from '../controllers/optionsController.js';
+import express from 'express';
+import { getOptions, getCarouselImages } from '../controllers/optionsController.js';
 
-const router = Router();
+const router = express.Router();
 
 router.get('/options', getOptions);
+router.get('/carousel-images', getCarouselImages);
 
 export default router;

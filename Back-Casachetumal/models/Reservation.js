@@ -39,7 +39,7 @@ const Reservation = sequelize.define('Reservation', {
     type: DataTypes.DATEONLY,
     allowNull: true, 
   },
-  idPhotoPath: { 
+ idPhotoUrl: { 
     type: DataTypes.STRING,
     allowNull: true,
   },
