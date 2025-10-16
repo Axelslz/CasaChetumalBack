@@ -96,6 +96,8 @@ export const createReservation = async (req, res) => {
       packageId,
       paymentMethod,
       paymentDeadline,
+      musicSchedule, 
+      musicNotes,
     };
 
     if (req.file) {

@@ -47,6 +47,14 @@ const Reservation = sequelize.define('Reservation', {
     type: DataTypes.ENUM('pending', 'confirmed', 'cancelled', 'paid'), 
     defaultValue: 'pending',
   },
+  musicSchedule: {
+    type: DataTypes.TEXT, 
+    allowNull: true,
+  },
+  musicNotes: {
+    type: DataTypes.TEXT, 
+    allowNull: true,
+  },
 }, {
   timestamps: true,
 });
