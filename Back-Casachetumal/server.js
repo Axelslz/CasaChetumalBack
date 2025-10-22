@@ -18,7 +18,7 @@ const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
 app.use(cors({
   origin: allowedOrigin,
   credentials: true
-}));
+})); 
 
 app.use(express.json());
 app.use(cookieParser());
@@ -27,6 +27,10 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.static('public'));
+
+app.get('/', (req, res) => {
+  res.status(200).send('API de Casa Chetumal está en línea y funcionando!');
+});
 
 app.use('/api', authRoutes);
 app.use('/api/reservations', reservationRoutes);
