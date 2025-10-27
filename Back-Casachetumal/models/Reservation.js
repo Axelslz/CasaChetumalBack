@@ -55,6 +55,19 @@ const Reservation = sequelize.define('Reservation', {
     type: DataTypes.TEXT, 
     allowNull: true,
   },
+  packageSnackSelections: {
+    type: DataTypes.JSON, 
+    allowNull: true
+  },
+  packageDrinkSelections: {
+    type: DataTypes.JSON, 
+    allowNull: true
+  },
+  includedDisposableQuantities: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    comment: 'Guarda las cantidades: { "vasos": 20, "tenedores": 20, "cucharas": 20, "charolas": 20 }'
+  }
 }, {
   timestamps: true,
 });

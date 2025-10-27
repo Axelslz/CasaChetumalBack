@@ -15,8 +15,9 @@ const Drink = sequelize.define('Drink', {
     allowNull: true,
   },
   image: {
-    type: DataTypes.BLOB('long'), 
+    type: DataTypes.STRING(1024), // DataTypes.TEXT, 
     allowNull: true,
+    defaultValue: 'https://res.cloudinary.com/dqozuofy6/image/upload/v1761162055/logo_logo_pdn5fh.png'
   }
 });
 export default Drink;

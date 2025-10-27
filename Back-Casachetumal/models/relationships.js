@@ -2,6 +2,7 @@ import Reservation from './Reservation.js';
 import Package from './Package.js';
 import Snack from './Snack.js';
 import Music from './Music.js';
+import Disposable from './Disposable.js';
 
 export const setupAssociations = () => {
   // Una Reservación pertenece a un Paquete

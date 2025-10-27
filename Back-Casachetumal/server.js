@@ -2,7 +2,7 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 import sequelize from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
-import cors from 'cors'; 
+import cors from 'cors';
 import reservationRoutes from './routes/reservationRoutes.js';
 import optionsRoutes from './routes/optionsRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
@@ -13,12 +13,24 @@ import { setupAssociations } from './models/relationships.js';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
+const whitelist = [
+  'https://casachetumal.com',      
+  'https://www.casachetumal.com', 
+  'http://localhost:5173'         
+];
 
-app.use(cors({
-  origin: allowedOrigin,
-  credentials: true
-})); 
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (whitelist.indexOf(origin) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error('No permitido por CORS'));
+    }
+  },
+  credentials: true 
+};
+
+app.use(cors(corsOptions));
 
 app.use(express.json());
 app.use(cookieParser());
@@ -35,20 +47,19 @@ app.get('/', (req, res) => {
 app.use('/api', authRoutes);
 app.use('/api/reservations', reservationRoutes);
 app.use('/api', optionsRoutes);
-app.use('/api', dashboardRoutes); 
+app.use('/api', dashboardRoutes);
 app.use('/api', calendarRoutes);
 
 const main = async () => {
   try {
-  
     await sequelize.authenticate();
     console.log('✅ Conexión a la base de datos establecida.');
 
-    setupAssociations(); 
-    
+    setupAssociations();
+
     await sequelize.sync({ alter: true });
     console.log('✅ Modelos sincronizados y tablas creadas.');
-    
+
     app.listen(PORT, () => {
       console.log(`🚀 Servidor escuchando en el puerto ${PORT}`);
     });

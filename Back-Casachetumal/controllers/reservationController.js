@@ -3,10 +3,12 @@ import Package from '../models/Package.js';
 import Music from '../models/Music.js';
 import Drink from '../models/Drink.js';
 import Snack from '../models/Snack.js';
+import Disposable from '../models/Disposable.js';
 import { Op } from 'sequelize';
 
+
 export const calculateTotal = async (req, res) => {
-  const SALON_BASE_PRICE = 3000;
+  const SALON_BASE_PRICE = 3250;
   try {
     const { packageId, addons, musicIds } = req.body;
     let total = SALON_BASE_PRICE;
@@ -30,10 +32,15 @@ export const calculateTotal = async (req, res) => {
       
       const snackPromise = Snack.findAll({ where: { id: addonIds } });
       const drinkPromise = Drink.findAll({ where: { id: addonIds } });
+      const disposablePromise = Disposable.findAll({ where: { id: addonIds } }); 
 
-      const [foundSnacks, foundDrinks] = await Promise.all([snackPromise, drinkPromise]);
+      const [foundSnacks, foundDrinks, foundDisposables] = await Promise.all([
+        snackPromise, 
+        drinkPromise, 
+        disposablePromise 
+      ]);
 
-      const allFoundAddons = [...foundSnacks, ...foundDrinks];
+      const allFoundAddons = [...foundSnacks, ...foundDrinks, ...foundDisposables]; 
       
       allFoundAddons.forEach(addon => {
         const quantity = addons[addon.id];
@@ -54,11 +61,12 @@ export const calculateTotal = async (req, res) => {
 export const createReservation = async (req, res) => {
   console.log('--- INICIO DE DEPURACIÓN: createReservation ---');
   console.log('CAMPOS DE TEXTO RECIBIDOS (req.body):', req.body);
-  console.log('ARCHIVO RECIBIDO (req.file):', req.file);
+  // req.file ahora es req.files
+  console.log('ARCHIVOS RECIBIDOS (req.files):', req.files); 
   console.log('--- FIN DE DEPURACIÓN ---');
 
   if (!req.body || Object.keys(req.body).length === 0) {
-    console.error('Error Crítico: req.body está vacío. El middleware multer no procesó los campos del formulario.');
+    console.error('Error Crítico: req.body está vacío.');
     return res.status(400).json({ message: "Error del servidor: No se recibieron datos del formulario." });
   }
 
@@ -66,43 +74,57 @@ export const createReservation = async (req, res) => {
     const {
       clientName, clientPhone, eventDate, eventTime,
       packageId, musicIds, snackIds, totalPrice,
-      paymentMethod, musicSchedule, musicNotes
+      paymentMethod, musicSchedule, musicNotes,
+      packageSnackSelections,
+      packageDrinkSelections,
+      includedDisposableQuantities,
+      cashPaymentDateTime 
     } = req.body;
 
     if (!clientName || !clientPhone || !eventDate) {
-        console.error('Error: Faltan campos esenciales en req.body, aunque el objeto no está vacío.');
+        console.error('Error: Faltan campos esenciales.');
         return res.status(400).json({ message: "Faltan datos requeridos como nombre, teléfono o fecha." });
     }
 
-    const today = new Date();
-    const eventDateObj = new Date(eventDate);
-    today.setHours(0, 0, 0, 0);
-    eventDateObj.setUTCHours(0, 0, 0, 0);
-    const daysDifference = (eventDateObj - today) / (1000 * 60 * 60 * 24);
-    if (daysDifference <= 8 && paymentMethod === 'cash') {
-      return res.status(400).json({
-        message: "Para eventos con menos de 8 días de anticipación, el pago solo puede ser por transferencia."
-      });
-    }
-    let paymentDeadline = null;
+    let paymentDeadline = null; 
+    let paymentReceiptUrl = null; 
+    let finalCashPaymentDateTime = null; 
+
     if (paymentMethod === 'cash') {
-      const deadlineDate = new Date(eventDate);
-      deadlineDate.setDate(deadlineDate.getDate() - 7);
-      paymentDeadline = deadlineDate.toISOString().split('T')[0];
+      if (!cashPaymentDateTime) {
+        const deadlineDate = new Date(eventDate);
+        deadlineDate.setDate(deadlineDate.getDate() - 7);
+        paymentDeadline = deadlineDate.toISOString().split('T')[0];
+      } else {
+        finalCashPaymentDateTime = new Date(cashPaymentDateTime);
+      }
+    }
+
+    let idPhotoUrl = null;
+    if (req.files && req.files.idPhoto) {
+      idPhotoUrl = req.files.idPhoto[0].path;
+    }
+    
+    if (req.files && req.files.receipt) {
+      paymentReceiptUrl = req.files.receipt[0].path;
     }
 
     const reservationData = {
       clientName, clientPhone, eventDate, eventTime, totalPrice,
       packageId,
       paymentMethod,
-      paymentDeadline,
+      paymentDeadline, 
+      paymentReceiptUrl, 
+      cashPaymentDateTime: finalCashPaymentDateTime, 
+      status: (paymentMethod === 'transfer') ? 'pending_payment' : 'pending_cash', 
+      paymentStatus: 'pending',
       musicSchedule, 
       musicNotes,
+      packageSnackSelections: packageSnackSelections ? JSON.parse(packageSnackSelections) : null,
+      packageDrinkSelections: packageDrinkSelections ? JSON.parse(packageDrinkSelections) : null,
+      includedDisposableQuantities: includedDisposableQuantities ? JSON.parse(includedDisposableQuantities) : null,
+      idPhotoUrl: idPhotoUrl 
     };
-
-    if (req.file) {
-      reservationData.idPhotoUrl = req.file.path;
-    }
 
     const newReservation = await Reservation.create(reservationData);
 
@@ -119,7 +141,7 @@ export const createReservation = async (req, res) => {
 
     res.status(201).json(newReservation);
   } catch (error) {
-    console.error("ERROR AL CREAR RESERVACIÓN (después de la validación):", error);
+    console.error("ERROR AL CREAR RESERVACIÓN:", error);
     res.status(500).json({ message: "Error al guardar la reservación en la base de datos.", error: error.message });
   }
 };

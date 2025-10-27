@@ -14,8 +14,9 @@ const Snack = sequelize.define('Snack', {
     allowNull: true, 
   },
   image: {
-    type: DataTypes.BLOB('long'), 
+    type: DataTypes.STRING(1024), // DataTypes.TEXT, 
     allowNull: true,
+    defaultValue: 'https://res.cloudinary.com/dqozuofy6/image/upload/v1761162055/logo_logo_pdn5fh.png'
   },
   price: {
     type: DataTypes.DECIMAL(10, 2),
