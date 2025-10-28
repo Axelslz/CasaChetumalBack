@@ -6,11 +6,10 @@ import Snack from '../models/Snack.js';
 import Disposable from '../models/Disposable.js';
 import { Op } from 'sequelize';
 
-
 export const calculateTotal = async (req, res) => {
   const SALON_BASE_PRICE = 3250;
   try {
-    const { packageId, addons, musicIds } = req.body;
+    const { packageId, addons, musicIds } = req.body; 
     let total = SALON_BASE_PRICE;
 
     if (packageId) {
@@ -28,25 +27,41 @@ export const calculateTotal = async (req, res) => {
     }
 
     if (addons && Object.keys(addons).length > 0) {
-      const addonIds = Object.keys(addons);
-      
-      const snackPromise = Snack.findAll({ where: { id: addonIds } });
-      const drinkPromise = Drink.findAll({ where: { id: addonIds } });
-      const disposablePromise = Disposable.findAll({ where: { id: addonIds } }); 
+      const snackIds = [];
+      const drinkIds = [];
+      const disposableIds = [];
+
+      for (const prefixedId in addons) {
+        const [type, idStr] = prefixedId.split('_');
+        const id = parseInt(idStr, 10);
+        if (!isNaN(id)) {
+          if (type === 'snack') snackIds.push(id);
+          else if (type === 'drink') drinkIds.push(id);
+          else if (type === 'disposable') disposableIds.push(id);
+        }
+      }
+
+      const snackPromise = snackIds.length > 0 ? Snack.findAll({ where: { id: snackIds } }) : Promise.resolve([]);
+      const drinkPromise = drinkIds.length > 0 ? Drink.findAll({ where: { id: drinkIds } }) : Promise.resolve([]);
+      const disposablePromise = disposableIds.length > 0 ? Disposable.findAll({ where: { id: disposableIds } }) : Promise.resolve([]);
 
       const [foundSnacks, foundDrinks, foundDisposables] = await Promise.all([
-        snackPromise, 
-        drinkPromise, 
-        disposablePromise 
+        snackPromise,
+        drinkPromise,
+        disposablePromise
       ]);
 
-      const allFoundAddons = [...foundSnacks, ...foundDrinks, ...foundDisposables]; 
-      
-      allFoundAddons.forEach(addon => {
-        const quantity = addons[addon.id];
-        if (quantity) {
-          total += parseFloat(addon.price) * quantity;
-        }
+      foundSnacks.forEach(item => {
+        const quantity = addons[`snack_${item.id}`];
+        if (quantity) total += parseFloat(item.price) * quantity;
+      });
+      foundDrinks.forEach(item => {
+        const quantity = addons[`drink_${item.id}`];
+        if (quantity) total += parseFloat(item.price) * quantity;
+      });
+      foundDisposables.forEach(item => {
+        const quantity = addons[`disposable_${item.id}`];
+        if (quantity) total += parseFloat(item.price) * quantity;
       });
     }
 
@@ -57,91 +72,163 @@ export const calculateTotal = async (req, res) => {
   }
 };
 
-
 export const createReservation = async (req, res) => {
   console.log('--- INICIO DE DEPURACIÓN: createReservation ---');
-  console.log('CAMPOS DE TEXTO RECIBIDOS (req.body):', req.body);
-  // req.file ahora es req.files
-  console.log('ARCHIVOS RECIBIDOS (req.files):', req.files); 
+  console.log('CAMPOS DE TEXTO RECIBIDOS (req.body):', req.body); 
+  console.log('ARCHIVOS RECIBIDOS (req.files):', req.files);
   console.log('--- FIN DE DEPURACIÓN ---');
 
-  if (!req.body || Object.keys(req.body).length === 0) {
-    console.error('Error Crítico: req.body está vacío.');
-    return res.status(400).json({ message: "Error del servidor: No se recibieron datos del formulario." });
+  if (!req.body || typeof req.body !== 'object') { 
+     console.error('Error Crítico: req.body no es un objeto válido.');
+     return res.status(400).json({ message: "Error del servidor: Datos del formulario inválidos." });
   }
 
   try {
     const {
       clientName, clientPhone, eventDate, eventTime,
-      packageId, musicIds, snackIds, totalPrice,
-      paymentMethod, musicSchedule, musicNotes,
-      packageSnackSelections,
-      packageDrinkSelections,
-      includedDisposableQuantities,
-      cashPaymentDateTime 
+      packageId, musicIds, /* Quitamos snackIds */ totalPrice,
+      paymentMethod: paymentMethodInput,
+      musicSchedule: musicScheduleString, 
+      musicNotes,
+      packageSnackSelections: packageSnackSelectionsString, 
+      packageDrinkSelections: packageDrinkSelectionsString, 
+      includedDisposableQuantities: includedDisposableQuantitiesString, 
+      cashPaymentDateTime,
+      addons: addonsString 
     } = req.body;
 
-    if (!clientName || !clientPhone || !eventDate) {
-        console.error('Error: Faltan campos esenciales.');
-        return res.status(400).json({ message: "Faltan datos requeridos como nombre, teléfono o fecha." });
+    let addons = {}; 
+    if (addonsString && typeof addonsString === 'string') {
+        try {
+            addons = JSON.parse(addonsString);
+            console.log("Addons parseados:", addons); 
+            if (typeof addons !== 'object' || addons === null) {
+                console.warn("Addons no se parseó como objeto:", addons);
+                addons = {}; 
+            }
+        } catch (e) {
+            console.error("Error al parsear addons JSON recibido:", e, addonsString);
+            addons = {}; 
+        }
+    } else if (addons && typeof addons === 'object') {
+        console.warn("Addons llegó como objeto, no como string JSON.");
+        addons = addons;
     }
 
-    let paymentDeadline = null; 
-    let paymentReceiptUrl = null; 
-    let finalCashPaymentDateTime = null; 
+    const finalPaymentMethod = Array.isArray(paymentMethodInput)
+                               ? paymentMethodInput[0]
+                               : paymentMethodInput;
+    if (!finalPaymentMethod || (finalPaymentMethod !== 'cash' && finalPaymentMethod !== 'transfer')) {
+        return res.status(400).json({ message: "Método de pago inválido." });
+    }
+    if (!clientName || !clientPhone || !eventDate) {
+        return res.status(400).json({ message: "Faltan datos requeridos." });
+    }
 
-    if (paymentMethod === 'cash') {
+    let paymentDeadline = null;
+    let paymentReceiptUrl = null;
+    let finalCashPaymentDateTime = null;
+    if (finalPaymentMethod === 'cash') {
       if (!cashPaymentDateTime) {
-        const deadlineDate = new Date(eventDate);
-        deadlineDate.setDate(deadlineDate.getDate() - 7);
-        paymentDeadline = deadlineDate.toISOString().split('T')[0];
+         const today = new Date();
+         const eventDateObj = new Date(eventDate);
+         today.setHours(0, 0, 0, 0);
+         eventDateObj.setUTCHours(0, 0, 0, 0);
+         const daysDifference = (eventDateObj - today) / (1000 * 60 * 60 * 24);
+         if(daysDifference > 8) {
+            const deadlineDate = new Date(eventDateObj);
+            deadlineDate.setDate(deadlineDate.getDate() - 7);
+            paymentDeadline = deadlineDate.toISOString().split('T')[0];
+         }
       } else {
         finalCashPaymentDateTime = new Date(cashPaymentDateTime);
       }
     }
-
     let idPhotoUrl = null;
-    if (req.files && req.files.idPhoto) {
+    if (req.files && req.files.idPhoto && req.files.idPhoto.length > 0) {
       idPhotoUrl = req.files.idPhoto[0].path;
     }
-    
-    if (req.files && req.files.receipt) {
+    if (req.files && req.files.receipt && req.files.receipt.length > 0) {
       paymentReceiptUrl = req.files.receipt[0].path;
     }
 
+    const addonsToSave = {};
+    const snackAddonIds = [];
+
+    if (addons && typeof addons === 'object') {
+        for (const prefixedId in addons) {
+            const [type, idStr] = prefixedId.split('_');
+            const id = parseInt(idStr, 10);
+            const quantity = addons[prefixedId]; 
+
+            if (!isNaN(id) && quantity > 0) {
+                if (type === 'snack') {
+                    snackAddonIds.push(id.toString());
+                } else if (type === 'drink' || type === 'disposable') {
+                    addonsToSave[prefixedId] = quantity; 
+                }
+            }
+        }
+    }
+   
+    const safeParseJsonField = (jsonString, fieldName) => {
+        if (!jsonString || typeof jsonString !== 'string') return null;
+        try {
+            const parsed = JSON.parse(jsonString);
+            return (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) ? parsed : null;
+        } catch (e) {
+            console.error(`Error al parsear ${fieldName} JSON:`, e, jsonString);
+            return null; 
+        }
+    };
+
+
     const reservationData = {
       clientName, clientPhone, eventDate, eventTime, totalPrice,
-      packageId,
-      paymentMethod,
-      paymentDeadline, 
-      paymentReceiptUrl, 
-      cashPaymentDateTime: finalCashPaymentDateTime, 
-      status: (paymentMethod === 'transfer') ? 'pending_payment' : 'pending_cash', 
+      packageId: packageId || null,
+      paymentMethod: finalPaymentMethod,
+      paymentDeadline,
+      paymentReceiptUrl,
+      cashPaymentDateTime: finalCashPaymentDateTime,
+      status: 'pending',
       paymentStatus: 'pending',
-      musicSchedule, 
+      musicSchedule: safeParseJsonField(musicScheduleString, 'musicSchedule'),
       musicNotes,
-      packageSnackSelections: packageSnackSelections ? JSON.parse(packageSnackSelections) : null,
-      packageDrinkSelections: packageDrinkSelections ? JSON.parse(packageDrinkSelections) : null,
-      includedDisposableQuantities: includedDisposableQuantities ? JSON.parse(includedDisposableQuantities) : null,
-      idPhotoUrl: idPhotoUrl 
+      packageSnackSelections: safeParseJsonField(packageSnackSelectionsString, 'packageSnackSelections'),
+      packageDrinkSelections: safeParseJsonField(packageDrinkSelectionsString, 'packageDrinkSelections'),
+      includedDisposableQuantities: safeParseJsonField(includedDisposableQuantitiesString, 'includedDisposableQuantities'),
+      idPhotoUrl: idPhotoUrl,
+      extraAddons: addonsToSave 
     };
 
     const newReservation = await Reservation.create(reservationData);
 
-    const finalSnackIds = Array.isArray(snackIds) ? snackIds : (snackIds ? [snackIds] : []);
-    const finalMusicIds = Array.isArray(musicIds) ? musicIds : (musicIds ? [musicIds] : []);
-
-    if (finalSnackIds.length > 0) {
-      await newReservation.addSnacks(finalSnackIds);
+    if (snackAddonIds.length > 0) {
+      await newReservation.addSnacks(snackAddonIds);
     }
 
+    let finalMusicIds = [];
+    if (musicIds) {
+        if (Array.isArray(musicIds)) {
+            finalMusicIds = musicIds.map(id => String(id));
+        } else if (typeof musicIds === 'string') {
+            finalMusicIds = [String(musicIds)];
+        }
+    }
     if (finalMusicIds.length > 0) {
       await newReservation.addMusic(finalMusicIds);
     }
 
+
     res.status(201).json(newReservation);
   } catch (error) {
     console.error("ERROR AL CREAR RESERVACIÓN:", error);
+     if (error.name === 'SequelizeValidationError') {
+       return res.status(400).json({ message: "Error de validación: " + error.errors.map(e => e.message).join(', ') });
+     }
+     if (error.name === 'SequelizeDatabaseError') {
+       return res.status(500).json({ message: "Error de base de datos al guardar.", detail: error.parent?.sqlMessage || error.message });
+     }
     res.status(500).json({ message: "Error al guardar la reservación en la base de datos.", error: error.message });
   }
 };
@@ -188,15 +275,31 @@ export const getReservationById = async (req, res) => {
     const { id } = req.params;
     const reservation = await Reservation.findByPk(id, {
       include: [
-        { model: Package },
-        { model: Music },
-        { model: Snack, through: { attributes: [] } }
+        {
+          model: Package, 
+        },
+        {
+          model: Music, 
+          through: { attributes: [] } 
+        },
+        {
+           model: Snack, 
+           through: { attributes: [] } 
+        }
       ]
     });
 
-    if (!reservation) return res.status(404).json({ message: "Reservación no encontrada." });
+    if (!reservation) {
+      return res.status(404).json({ message: "Reservación no encontrada." });
+    }
+
     res.json(reservation);
+
   } catch (error) {
+    console.error("Error al obtener la reservación por ID:", error);
+    if (error.name === 'SequelizeEagerLoadingError') {
+         return res.status(500).json({ message: "Error interno: Problema al cargar datos relacionados.", detail: error.message });
+     }
     res.status(500).json({ message: "Error al obtener la reservación." });
   }
 };

@@ -67,6 +67,11 @@ const Reservation = sequelize.define('Reservation', {
     type: DataTypes.JSON,
     allowNull: true,
     comment: 'Guarda las cantidades: { "vasos": 20, "tenedores": 20, "cucharas": 20, "charolas": 20 }'
+  },
+  extraAddons: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      comment: 'Guarda extras de personalización: { "drink_5": 2, "disposable_1": 3 }'
   }
 }, {
   timestamps: true,
