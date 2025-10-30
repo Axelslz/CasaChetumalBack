@@ -26,43 +26,42 @@ export const register = async (req, res) => {
 };
 
 export const login = async (req, res) => {
+    const { email, password } = req.body;
+    try {
+        const userFound = await User.findOne({ where: { email } });
 
-    const { email, password } = req.body;
-    try {
-        const userFound = await User.findOne({ where: { email } });
+        if (!userFound) {
+            return res.status(400).json({ message: "Credenciales inválidas." }); 
+        }
 
-        if (!userFound) {
-            return res.status(400).json({ message: "Credenciales inválidas." }); 
-        }
+        const isMatch = await userFound.comparePassword(password);
+        if (!isMatch) {
+            return res.status(400).json({ message: "Credenciales inválidas." }); 
+        }
 
-        const isMatch = await userFound.comparePassword(password);
-        if (!isMatch) {
-            return res.status(400).json({ message: "Credenciales inválidas." }); 
-        }
+        const token = jwt.sign(
+            { 
+                id: userFound.id,
+                role: userFound.role 
+            }, 
+            process.env.TOKEN_SECRET, 
+            { expiresIn: '1d' } 
+        );
 
-        const token = jwt.sign(
-            { id: userFound.id }, 
-            process.env.TOKEN_SECRET, 
-            { expiresIn: '1d' } 
-        );
-
-        res.cookie('token', token, {    
-            httpOnly: true, 
-            secure: process.env.NODE_ENV === 'production', 
-            sameSite: 'lax',
-        });
-
-        res.json({ 
-            id: userFound.id,
-            email: userFound.email,
-            username: userFound.username,
-            role: userFound.role,
+        res.json({ 
+            token, 
+            user: { 
+                id: userFound.id,
+                email: userFound.email,
+                username: userFound.username,
+                role: userFound.role,
+            }
         });
 
-    } catch (error) {
+    } catch (error) {
         console.error("ERROR EN LOGIN:", error);
-        res.status(500).json({ message: "Error en el inicio de sesión.", error: error.message });
-    }
+        res.status(500).json({ message: "Error en el inicio de sesión.", error: error.message });
+    }
 };
 
 export const logout = (req, res) => {
@@ -73,4 +72,21 @@ export const logout = (req, res) => {
         sameSite: 'lax',
      });
     return res.sendStatus(200); 
+};
+
+export const verifyToken = async (req, res) => {
+    
+    try {
+        const user = await User.findByPk(req.user.id, {
+            attributes: ['id', 'email', 'username', 'role'] 
+        });
+
+        if (!user) return res.status(404).json({ message: "Usuario no encontrado" });
+
+        return res.json(user);
+
+    } catch (error) {
+        console.error("ERROR EN VERIFYTOKEN:", error);
+        return res.status(500).json({ message: "Error al verificar el token.", error: error.message });
+    }
 };

@@ -1,20 +1,26 @@
 import jwt from 'jsonwebtoken';
 import 'dotenv/config';
 
-export const authRequired = (req, res, next) => {
-    const { token } = req.cookies;
-
-    if (!token) {
+export const authMiddleware = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    
+    if (!authHeader) {
         return res.status(401).json({ message: "No hay token, autorización denegada." });
     }
 
-    jwt.verify(token, process.env.TOKEN_SECRET, (err, decoded) => {
-        if (err) {
-            return res.status(403).json({ message: "Token inválido." });
-        }
-        
+    const token = authHeader.split(' ')[1]; 
+    if (!token) {
+        return res.status(401).json({ message: "Token en formato inválido." });
+    }
+
+    try {
+        const decoded = jwt.verify(token, process.env.TOKEN_SECRET);
         req.user = decoded; 
         
-        next();
-    });
+        next(); 
+    } catch (error) {
+        console.error("ERROR DE TOKEN:", error.message);
+        res.status(401).json({ message: "Token no es válido." });
+    }
 };
+
