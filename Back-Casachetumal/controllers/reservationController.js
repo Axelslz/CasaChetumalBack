@@ -239,9 +239,11 @@ export const getReservations = async (req, res) => {
     const { status, search } = req.query; 
     
     const whereClause = {};
+    
     if (status && status !== 'all') {
       whereClause.status = status; 
     }
+    
     if (search) {
       whereClause.clientName = { [Op.like]: `%${search}%` };
     }
@@ -260,8 +262,11 @@ export const getReservations = async (req, res) => {
       fecha: r.eventDate,   
       paquete: r.Package ? r.Package.name : 'No Asignado', 
       estado: r.status,
-      status: r.status       
+      status: r.status,
+      monto: parseFloat(r.totalPrice), 
+      metodo: r.paymentMethod === 'transfer' ? 'Transferencia' : 'Efectivo' 
     }));
+    
     res.json(formattedReservations);
 
   } catch (error) {
