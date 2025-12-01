@@ -1,4 +1,4 @@
-/* import { Sequelize } from 'sequelize';
+import { Sequelize } from 'sequelize';
 import 'dotenv/config';
 
 const dbUrl = process.env.DATABASE_URL;
@@ -17,8 +17,8 @@ const sequelize = new Sequelize(dbUrl, {
   }
 });
 
-export default sequelize; */
-
+export default sequelize;
+/* 
 import { Sequelize } from 'sequelize';
 import 'dotenv/config';
 
@@ -33,4 +33,4 @@ import 'dotenv/config';
   }
 );
 
-export default sequelize;
+export default sequelize; */
