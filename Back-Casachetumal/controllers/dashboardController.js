@@ -18,12 +18,13 @@ export const getPaymentMethodSummary = async (req, res) => {
 
     const formattedSummary = paymentSummary.map(item => ({
       method: item.paymentMethod === 'cash' ? 'Efectivo' : 'Transferencia',
-      count: item.count
+      count: parseInt(item.count, 10) 
     }));
 
     res.json(formattedSummary);
 
   } catch (error) {
+    console.error("Error en getPaymentMethodSummary:", error);
     res.status(500).json({ message: "Error al obtener el resumen de métodos de pago.", error: error.message });
   }
 };
@@ -46,7 +47,7 @@ export const getDashboardStats = async (req, res) => {
         attributes: [] 
       }],
       where: { status: { [Op.ne]: 'cancelled' } },
-      group: ['Package.name'],
+      group: ['Package.name'], 
       raw: true
     });
 
@@ -66,6 +67,7 @@ export const getDashboardStats = async (req, res) => {
     });
 
   } catch (error) {
+    console.error("Error en getDashboardStats:", error);
     res.status(500).json({ message: "Error al obtener las estadísticas del dashboard.", error: error.message });
   }
 };
@@ -114,7 +116,7 @@ export const getFullDashboardStats = async (req, res) => {
     const firstDayOfLast6Months = new Date(today.getFullYear(), today.getMonth() - 5, 1);
 
     const totalIncome = await Reservation.sum('totalPrice', { 
-      where: { status: 'paid' } 
+        where: { status: 'paid' } 
     }) || 0;
 
     const activeReservations = await Reservation.count({ 
@@ -136,29 +138,35 @@ export const getFullDashboardStats = async (req, res) => {
       col: 'clientName',
       where: { createdAt: { [Op.gte]: firstDayOfCurrentMonth } },
     });
-    
+   
     const reservationsByMonthRaw = await Reservation.findAll({
       where: { 
         eventDate: { [Op.gte]: firstDayOfLast6Months },
         status: { [Op.ne]: 'cancelled' }
       },
       attributes: [
-        [Sequelize.fn('YEAR', Sequelize.col('eventDate')), 'year'],
-        [Sequelize.fn('MONTH', Sequelize.col('eventDate')), 'month'],
+        [Sequelize.fn('date_part', 'year', Sequelize.col('eventDate')), 'year'],
+        [Sequelize.fn('date_part', 'month', Sequelize.col('eventDate')), 'month'],
         [Sequelize.fn('COUNT', Sequelize.col('id')), 'reservas'],
       ],
-      group: ['year', 'month'],
-      order: [['year', 'ASC'], ['month', 'ASC']],
+      group: [
+        Sequelize.fn('date_part', 'year', Sequelize.col('eventDate')),
+        Sequelize.fn('date_part', 'month', Sequelize.col('eventDate'))
+      ],
+      order: [
+        [Sequelize.col('year'), 'ASC'], 
+        [Sequelize.col('month'), 'ASC']
+      ],
       raw: true,
     });
     
     const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
     const reservationsByMonth = reservationsByMonthRaw.map(item => ({
-      mes: `${monthNames[item.month - 1]}`,
-      reservas: item.reservas,
+      mes: `${monthNames[parseInt(item.month) - 1]}`, 
+      reservas: parseInt(item.reservas, 10),
     }));
 
-    const SALON_BASE_PRICE = 3250; 
+    const SALON_BASE_PRICE = 3250;
     const totalPaidReservationsCount = await Reservation.count({ where: { status: 'paid' } });
     
     const incomeFromSalon = totalPaidReservationsCount * SALON_BASE_PRICE;
@@ -176,7 +184,7 @@ export const getFullDashboardStats = async (req, res) => {
         [Sequelize.fn('SUM', Sequelize.col('totalPrice')), 'totalSpent'],
       ],
       group: ['clientName'],
-      order: [[Sequelize.literal('totalSpent'), 'DESC']],
+      order: [[Sequelize.literal('"totalSpent"'), 'DESC']], 
       limit: 5,
       raw: true,
     });
@@ -200,6 +208,6 @@ export const getFullDashboardStats = async (req, res) => {
 
   } catch (error) {
     console.error("Error al obtener las estadísticas del dashboard:", error);
-    res.status(500).json({ message: "Error al obtener las estadísticas." });
+    res.status(500).json({ message: "Error al obtener las estadísticas.", detail: error.message });
   }
 };
