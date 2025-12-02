@@ -18,6 +18,7 @@ const sequelize = new Sequelize(dbUrl, {
 });
 
 export default sequelize;
+
 /* 
 import { Sequelize } from 'sequelize';
 import 'dotenv/config';

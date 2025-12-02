@@ -10,14 +10,14 @@ export const getPaymentMethodSummary = async (req, res) => {
         [Sequelize.fn('COUNT', Sequelize.col('id')), 'count']
       ],
       where: {
-        status: 'confirmed'
+        status: { [Op.or]: ['confirmed', 'paid'] }
       },
       group: ['paymentMethod'],
       raw: true
     });
 
     const formattedSummary = paymentSummary.map(item => ({
-      method: item.paymentMethod.charAt(0).toUpperCase() + item.paymentMethod.slice(1),
+      method: item.paymentMethod === 'cash' ? 'Efectivo' : 'Transferencia',
       count: item.count
     }));
 
@@ -32,7 +32,9 @@ export const getPaymentMethodSummary = async (req, res) => {
 export const getDashboardStats = async (req, res) => {
   try {
     const totalReservations = await Reservation.count();
-    const confirmedEvents = await Reservation.count({ where: { status: 'confirmed' } });
+    const confirmedEvents = await Reservation.count({ 
+        where: { status: { [Op.or]: ['confirmed', 'paid'] } } 
+    });
 
     const packageTypes = await Reservation.findAll({
       attributes: [
@@ -43,6 +45,7 @@ export const getDashboardStats = async (req, res) => {
         model: Package,
         attributes: [] 
       }],
+      where: { status: { [Op.ne]: 'cancelled' } },
       group: ['Package.name'],
       raw: true
     });
@@ -71,7 +74,7 @@ export const getAllPaidReservations = async (req, res) => {
   try {
     const paidReservations = await Reservation.findAll({
       where: {
-        status: 'confirmed' 
+        status: { [Op.or]: ['confirmed', 'paid'] }
       },
       attributes: [ 
         'id',
@@ -92,7 +95,7 @@ export const getAllPaidReservations = async (req, res) => {
         day: 'numeric'
       }), 
       metodo: res.paymentMethod === 'cash' ? 'Efectivo' : 'Transferencia', 
-      monto: res.totalPrice 
+      monto: parseFloat(res.totalPrice) 
     }));
 
     res.json(formattedReservations);
@@ -106,12 +109,28 @@ export const getAllPaidReservations = async (req, res) => {
 export const getFullDashboardStats = async (req, res) => {
   try {
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const firstDayOfCurrentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const firstDayOfLast6Months = new Date(today.getFullYear(), today.getMonth() - 5, 1);
 
-    const totalIncome = await Reservation.sum('totalPrice', { where: { status: 'paid' } });
-    const activeReservations = await Reservation.count({ where: { status: 'confirmed' } });
-    const upcomingEvents = await Reservation.count({ where: { eventDate: { [Op.gte]: today } } });
+    const totalIncome = await Reservation.sum('totalPrice', { 
+      where: { status: 'paid' } 
+    }) || 0;
+
+    const activeReservations = await Reservation.count({ 
+      where: { 
+        status: { [Op.in]: ['confirmed', 'paid'] },
+        eventDate: { [Op.gte]: today }
+      } 
+    });
+
+    const upcomingEvents = await Reservation.count({ 
+      where: { 
+        status: { [Op.ne]: 'cancelled' },
+        eventDate: { [Op.gte]: today } 
+      } 
+    });
+
     const newClientsThisMonth = await Reservation.count({
       distinct: true,
       col: 'clientName',
@@ -119,7 +138,10 @@ export const getFullDashboardStats = async (req, res) => {
     });
     
     const reservationsByMonthRaw = await Reservation.findAll({
-      where: { eventDate: { [Op.gte]: firstDayOfLast6Months } },
+      where: { 
+        eventDate: { [Op.gte]: firstDayOfLast6Months },
+        status: { [Op.ne]: 'cancelled' }
+      },
       attributes: [
         [Sequelize.fn('YEAR', Sequelize.col('eventDate')), 'year'],
         [Sequelize.fn('MONTH', Sequelize.col('eventDate')), 'month'],
@@ -136,15 +158,15 @@ export const getFullDashboardStats = async (req, res) => {
       reservas: item.reservas,
     }));
 
-    const SALON_BASE_PRICE = 3000;
-    const totalIncomeFromPackages = await Reservation.sum('totalPrice', { where: { status: 'paid' } });
-    const totalPaidReservations = await Reservation.count({ where: { status: 'paid' } });
-    const incomeFromSalon = totalPaidReservations * SALON_BASE_PRICE;
-    const incomeFromExtras = totalIncomeFromPackages - incomeFromSalon;
+    const SALON_BASE_PRICE = 3250; 
+    const totalPaidReservationsCount = await Reservation.count({ where: { status: 'paid' } });
+    
+    const incomeFromSalon = totalPaidReservationsCount * SALON_BASE_PRICE;
+    const incomeFromExtras = Math.max(0, totalIncome - incomeFromSalon);
 
     const incomeDistribution = [
-      { name: 'Ingreso Salón', value: incomeFromSalon > 0 ? incomeFromSalon : 0 },
-      { name: 'Ingreso Extras', value: incomeFromExtras > 0 ? incomeFromExtras : 0 },
+      { name: 'Ingreso Salón', value: incomeFromSalon },
+      { name: 'Ingreso Extras', value: incomeFromExtras },
     ];
  
     const frequentClients = await Reservation.findAll({
