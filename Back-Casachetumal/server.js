@@ -9,6 +9,7 @@ import dashboardRoutes from './routes/dashboardRoutes.js';
 import calendarRoutes from './routes/calendarRoutes.js';
 
 import { setupAssociations } from './models/relationships.js';
+import { startWhatsappBot } from './services/whatsappService.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -59,6 +60,8 @@ const main = async () => {
 
     await sequelize.sync({ alter: true });
     console.log('✅ Modelos sincronizados y tablas creadas.');
+
+    startWhatsappBot();
 
     app.listen(PORT, () => {
       console.log(`🚀 Servidor escuchando en el puerto ${PORT}`);
