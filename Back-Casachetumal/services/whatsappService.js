@@ -83,6 +83,12 @@ client.on('ready', () => {
 });
 
 client.on('message', async (msg) => {
+
+    // --- 🔍 LOGS DE DEPURACIÓN (AGREGAR ESTO) ---
+    console.log(`📩 MENSAJE RECIBIDO de: ${msg.from}`);
+    console.log(`💬 Texto: "${msg.body}"`);
+    console.log(`🕒 Timestamp mensaje: ${msg.timestamp}`);
+    
     const chat = await msg.getChat();
     if (chat.isGroup || msg.from === 'status@broadcast') return;
 

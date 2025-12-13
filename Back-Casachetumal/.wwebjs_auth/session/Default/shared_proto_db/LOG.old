@@ -1,2 +1,3 @@
-2025/12/06-11:46:32.979 f04 Creating DB C:\Users\DELL\CasaChetumalBack\Back-Casachetumal\.wwebjs_auth\session\Default\shared_proto_db since it was missing.
-2025/12/06-11:46:32.982 f04 Reusing MANIFEST C:\Users\DELL\CasaChetumalBack\Back-Casachetumal\.wwebjs_auth\session\Default\shared_proto_db/MANIFEST-000001
+2025/12/10-13:24:01.965 23bc Reusing MANIFEST C:\Users\DELL\CasaChetumalBack\Back-Casachetumal\.wwebjs_auth\session\Default\shared_proto_db/MANIFEST-000001
+2025/12/10-13:24:01.972 23bc Recovering log #3
+2025/12/10-13:24:01.972 23bc Reusing old log C:\Users\DELL\CasaChetumalBack\Back-Casachetumal\.wwebjs_auth\session\Default\shared_proto_db/000003.log 
