@@ -60,8 +60,22 @@ const ACTIVATION_KEYWORDS = [
 const userSessions = {};
 
 const client = new Client({
-    authStrategy: new LocalAuth(),
-    puppeteer: { args: ['--no-sandbox', '--disable-setuid-sandbox'] }
+    authStrategy: new LocalAuth({
+        dataPath: '/var/lib/docker/tmp' 
+    }),
+    puppeteer: { 
+        headless: true, 
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage', 
+            '--disable-accelerated-2d-canvas', 
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process', 
+            '--disable-gpu'   
+        ] 
+    }
 });
 
 const notifyGroup = async (message) => {
@@ -84,15 +98,11 @@ client.on('ready', () => {
 
 client.on('message', async (msg) => {
 
-    // --- 🔍 LOGS DE DEPURACIÓN (AGREGAR ESTO) ---
-    console.log(`📩 MENSAJE RECIBIDO de: ${msg.from}`);
-    console.log(`💬 Texto: "${msg.body}"`);
-    console.log(`🕒 Timestamp mensaje: ${msg.timestamp}`);
-    
     const chat = await msg.getChat();
     if (chat.isGroup || msg.from === 'status@broadcast') return;
 
     const messageDate = new Date(msg.timestamp * 1000);
+    // Filtro de tiempo (60s)
     if ((new Date() - messageDate) / 1000 > 60) return;
 
     const sender = msg.from;
@@ -115,7 +125,7 @@ client.on('message', async (msg) => {
         if (ACTIVATION_KEYWORDS.some(k => textLower.includes(k))) {
             userSessions[sender] = { step: STEPS.MAIN_MENU, businessId: null, data: {} };
         } else {
-            return; // Ignorar
+            return; 
         }
     } else {
         if (['volver', 'regresar', 'menu', 'atras'].includes(textLower)) {
@@ -168,10 +178,10 @@ client.on('message', async (msg) => {
                 await chat.sendMessage(
                     `🤖 *Hola, mi nombre es Atom, soy tu asistente virtual.* \nEs un gusto saludarte. 👋\n\n` +
                    `¿En qué empresa deseas realizar tu consulta hoy?\n\n` +
-                    `1️⃣ 🏊 Casa Chetumal\n` +
+                    `1️⃣ 🏊 Casa Chetumal (Terraza & Alberca)\n` +
                     `2️⃣ 🛠️ Ferre La Bodega\n` +
                     `3️⃣ 🏗️ Constructora Jaizur\n` +
-                    `4️⃣ 🚛 Tracta Transporte\n` +
+                    `4️⃣ 🚛 Tracta Transporte y Grúa\n` +
                     `5️⃣ 🥗 Jardín de Sabores\n\n` +
                     `_Escribe el número (1-5)._`
                 );
@@ -227,7 +237,7 @@ client.on('message', async (msg) => {
                     const media = MessageMedia.fromFilePath('./public/info_casa.pdf');
                     await chat.sendMessage(media);
                 } catch (e) {}
-                await chat.sendMessage(`¿Qué sigue?\n1️⃣ Reservar (Tengo fecha) 📅\n2️⃣ Agendar Visita 👀\n3️⃣ Volver 🔙`);
+                await chat.sendMessage(`¿Qué deseas hacer ahora?\n1️⃣ Iniciar Reservación (Tengo fecha) 📅\n2️⃣ Agendar Visita Previa 👀\n3️⃣ Volver al Menu 🔙`);
                 session.step = STEPS.CASA_INFO_DECISION;
             } else if (text === '3') {
                 await chat.sendMessage('👤 Un encargado te contactará.');
@@ -247,7 +257,7 @@ client.on('message', async (msg) => {
                 await chat.sendMessage('📅 Escribe fecha evento: *AAAA-MM-DD*.');
             } else if (text === '2') {
                 session.step = STEPS.VISIT_COLLECT_DAY;
-                await chat.sendMessage('👀 *Agendar Visita*\n¿Qué *DÍA* puedes venir? (Ej: Jueves 20).');
+                await chat.sendMessage('👀 *Agendar Visita*\nRecuerda nuestro horario: Lun - Vie 8am - 5pm. Sabado 9am - 2pm\n\n¿Qué *DÍA* te gustaría visitarnos? (Ej: Este Jueves, 20 de Octubre)');
             } else if (text === '3') {
                 session.step = STEPS.CASA_MENU;
                 await chat.sendMessage(`🏰 *Casa Chetumal*\n1️⃣ Reservar\n2️⃣ Info/Visitas\n3️⃣ Asesor\n4️⃣ Salir`);
@@ -264,7 +274,7 @@ client.on('message', async (msg) => {
             }
             session.data.visitDay = text;
             session.step = STEPS.VISIT_COLLECT_TIME;
-            await chat.sendMessage('🕒 ¿A qué *HORA*? (Horario: 8am - 5pm)');
+            await chat.sendMessage('🕒 ¿A qué *HORA*? (Horario:  Lun - Vie 8am - 5pm. Sabado 9am - 2pm)');
             break;
 
         case STEPS.VISIT_COLLECT_TIME:
@@ -363,7 +373,15 @@ client.on('message', async (msg) => {
                     musicNotes: notes
                 });
                 await chat.sendMessage(`🎉 *¡Pre-reserva lista!* Fecha: ${session.data.eventDate}.\n⚠️ Falta anticipo. Visítanos de 8am a 5pm.`);
-                notifyGroup(`📅 *RESERVA ATOM*\n👤 ${session.data.clientName}\n📆 ${session.data.eventDate}\n📱 ${realPhoneNumber}`);
+                
+                notifyGroup(
+                    `📅 *RESERVA ATOM*\n` +
+                    `👤 ${session.data.clientName}\n` +
+                    `📆 ${session.data.eventDate}\n` +
+                    `📱 ${realPhoneNumber}`
+                );
+                // ----------------------------------------------------
+
             } catch (error) {
                 console.error(error);
                 await chat.sendMessage('Error al guardar. Contacta a un humano.');
