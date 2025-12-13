@@ -60,9 +60,7 @@ const ACTIVATION_KEYWORDS = [
 const userSessions = {};
 
 const client = new Client({
-    authStrategy: new LocalAuth({
-        dataPath: '/var/lib/docker/tmp' 
-    }),
+    authStrategy: new LocalAuth(), 
     puppeteer: { 
         headless: true, 
         args: [
